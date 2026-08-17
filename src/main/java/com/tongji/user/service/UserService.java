@@ -12,11 +12,15 @@ public interface UserService {
 
     Optional<User> findByEmail(String email);
 
+    Optional<User> findByZgId(String zgId);
+
     Optional<User> findById(long id);
 
     boolean existsByPhone(String phone);
 
     boolean existsByEmail(String email);
+
+    boolean existsByZgId(String zgId);
 
     User createUser(User user);
 

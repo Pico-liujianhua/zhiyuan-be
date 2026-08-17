@@ -2,7 +2,8 @@ package com.tongji.auth.model;
 
 public enum IdentifierType {
     PHONE,
-    EMAIL;
+    EMAIL,
+    USERNAME;
 
     public static IdentifierType fromString(String value) {
         if (value == null) {
@@ -11,6 +12,7 @@ public enum IdentifierType {
         return switch (value.toLowerCase()) {
             case "phone", "mobile" -> PHONE;
             case "email" -> EMAIL;
+            case "username", "user", "account" -> USERNAME;
             default -> throw new IllegalArgumentException("Unsupported identifier type: " + value);
         };
     }

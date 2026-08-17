@@ -118,30 +118,26 @@ public class AuthService {
      * @throws BusinessException 当未同意协议、标识冲突、验证码失败、密码不合规时抛出。
      */
     public AuthResponse register(RegisterRequest request, ClientInfo clientInfo) {
-        ensureVerificationEnabled();
         if (!request.agreeTerms()) {
             throw new BusinessException(ErrorCode.TERMS_NOT_ACCEPTED);
         }
         validateIdentifier(request.identifierType(), request.identifier());
+        validatePassword(request.password());
         String identifier = normalizeIdentifier(request.identifierType(), request.identifier());
         if (identifierExists(request.identifierType(), identifier)) {
             throw new BusinessException(ErrorCode.IDENTIFIER_EXISTS);
         }
-        ensureVerificationSuccess(verificationService.verify(VerificationScene.REGISTER, identifier, request.code()));
 
         User user = User.builder()
                 .phone(request.identifierType() == IdentifierType.PHONE ? identifier : null)
                 .email(request.identifierType() == IdentifierType.EMAIL ? identifier : null)
+                .zgId(request.identifierType() == IdentifierType.USERNAME ? identifier : null)
                 .nickname(generateNickname())
                 .avatar(null)
                 .bio(null)
                 .tagsJson("[]")
+                .passwordHash(passwordEncoder.encode(request.password().trim()))
                 .build();
-
-        if (StringUtils.hasText(request.password())) {
-            validatePassword(request.password());
-            user.setPasswordHash(passwordEncoder.encode(request.password().trim()));
-        }
 
         userService.createUser(user);
         TokenPair tokenPair = jwtService.issueTokenPair(user);
@@ -363,6 +359,12 @@ public class AuthService {
         if (type == IdentifierType.EMAIL && !IdentifierValidator.isValidEmail(identifier)) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "邮箱格式错误");
         }
+        if (type == IdentifierType.USERNAME) {
+            String value = identifier == null ? "" : identifier.trim();
+            if (!value.matches("^[A-Za-z0-9_-]{3,32}$")) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "用户名需为3-32位字母、数字、下划线或短横线");
+            }
+        }
     }
 
     /**
@@ -397,6 +399,7 @@ public class AuthService {
         return switch (type) {
             case PHONE -> userService.existsByPhone(identifier);
             case EMAIL -> userService.existsByEmail(identifier);
+            case USERNAME -> userService.existsByZgId(identifier);
         };
     }
 
@@ -411,6 +414,7 @@ public class AuthService {
         return switch (type) {
             case PHONE -> userService.findByPhone(identifier);
             case EMAIL -> userService.findByEmail(identifier);
+            case USERNAME -> userService.findByZgId(identifier);
         };
     }
 
@@ -426,7 +430,7 @@ public class AuthService {
 
     private void ensureVerificationEnabled() {
         if (!authProperties.getVerification().isEnabled()) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "验证码登录已关闭，请使用微信扫码登录");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "验证码登录已关闭，请使用用户名和密码登录");
         }
     }
 
@@ -525,6 +529,7 @@ public class AuthService {
         return switch (type) {
             case PHONE -> identifier.trim();
             case EMAIL -> identifier.trim().toLowerCase(Locale.ROOT);
+            case USERNAME -> identifier.trim().toLowerCase(Locale.ROOT);
         };
     }
 

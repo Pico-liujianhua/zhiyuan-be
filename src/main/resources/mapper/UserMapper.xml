@@ -35,6 +35,13 @@
         LIMIT 1
     </select>
 
+    <select id="findByZgId" parameterType="string" resultMap="UserResultMap">
+        SELECT *
+        FROM users
+        WHERE zg_id = #{zgId}
+        LIMIT 1
+    </select>
+
     <select id="existsByPhone" parameterType="string" resultType="boolean">
         SELECT EXISTS(
             SELECT 1
@@ -48,6 +55,14 @@
             SELECT 1
             FROM users
             WHERE email = #{email}
+        )
+    </select>
+
+    <select id="existsByZgId" parameterType="string" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM users
+            WHERE zg_id = #{zgId}
         )
     </select>
 

@@ -39,6 +39,11 @@ public class UserServiceImpl implements UserService {
         return Optional.ofNullable(userMapper.findByEmail(email));
     }
 
+    @Transactional(readOnly = true)
+    public Optional<User> findByZgId(String zgId) {
+        return Optional.ofNullable(userMapper.findByZgId(zgId));
+    }
+
     /**
      * 根据 ID 查询用户。
      *
@@ -70,6 +75,11 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public boolean existsByEmail(String email) {
         return userMapper.existsByEmail(email);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean existsByZgId(String zgId) {
+        return userMapper.existsByZgId(zgId);
     }
 
     /**
