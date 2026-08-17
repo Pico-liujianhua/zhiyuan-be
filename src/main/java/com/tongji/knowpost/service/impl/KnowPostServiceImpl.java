@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -143,6 +144,18 @@ public class KnowPostServiceImpl implements KnowPostService {
      */
     @Transactional
     public void updateMetadata(long creatorId, long id, String title, Long tagId, List<String> tags, List<String> imgUrls, String visible, Boolean isTop, String description) {
+        if (title != null && title.trim().length() > 120) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "标题不能超过120字");
+        }
+        if (description != null && description.trim().length() > 50) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "摘要不能超过50字");
+        }
+        if (imgUrls != null && imgUrls.size() > 9) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "图片最多9张");
+        }
+        if (visible != null && !isPublishVisible(visible)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "可见性只能选择公开或私密");
+        }
         invalidateCache(id);
 
         KnowPost post = KnowPost.builder()
@@ -182,6 +195,15 @@ public class KnowPostServiceImpl implements KnowPostService {
      */
     @Transactional
     public void publish(long creatorId, long id) {
+        KnowPost post = mapper.findById(id);
+        if (post == null || post.getCreatorId() == null || !post.getCreatorId().equals(creatorId)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或无权限");
+        }
+        if (!"draft".equals(post.getStatus())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "仅草稿可以发布");
+        }
+        validateBeforePublish(post);
+
         int updated = mapper.publish(id, creatorId);
 
         if (updated == 0) {
@@ -285,6 +307,38 @@ public class KnowPostServiceImpl implements KnowPostService {
             case "public", "followers", "school", "private", "unlisted" -> true;
             default -> false;
         };
+    }
+
+    private boolean isPublishVisible(String visible) {
+        return "public".equals(visible) || "private".equals(visible);
+    }
+
+    private void validateBeforePublish(KnowPost post) {
+        if (!StringUtils.hasText(post.getTitle())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "发布前请填写标题");
+        }
+        if (post.getTitle().trim().length() > 120) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "标题不能超过120字");
+        }
+        if (!StringUtils.hasText(post.getContentObjectKey()) || !StringUtils.hasText(post.getContentUrl())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "发布前请填写正文");
+        }
+        if (post.getContentSize() == null || post.getContentSize() <= 0) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "正文不能为空");
+        }
+        if (StringUtils.hasText(post.getDescription()) && post.getDescription().trim().length() > 50) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "摘要不能超过50字");
+        }
+        if (!isPublishVisible(post.getVisible())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "可见性只能选择公开或私密");
+        }
+        List<String> images = parseStringArray(post.getImgUrls());
+        if (images.isEmpty()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "至少上传1张图片");
+        }
+        if (images.size() > 9) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "图片最多9张");
+        }
     }
 
     private String toJsonOrNull(List<String> list) {
